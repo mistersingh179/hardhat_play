@@ -2,7 +2,6 @@ import logo from './logo.svg';
 import './App.css';
 import React from 'react'
 import {Button, Col, Container, Form, FormControl, InputGroup, Row} from "react-bootstrap";
-import MetamaskConnection from "./components/MetamaskConnection"
 import {ethers} from 'ethers'
 window.ethers = ethers
 
