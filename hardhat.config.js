@@ -53,7 +53,7 @@ module.exports = {
       url: "https://eth-rinkeby.alchemyapi.io/v2/9KvVSlPxlm2m7-xkEQeIc_pYRr_Y-rwp",
       // from: 0x820b6A6a2e26d7C0398B2D436f69EF007c137132, // this is default sender which defaults to first account
       // accounts: 'remote' // accounts used by hardhat
-      accounts: [process.env.acc1_private_key, process.env.acc2_private_key]
+      accounts: [process.env.acc0_private_key, process.env.acc1_private_key]
     }
   },
   etherscan: {

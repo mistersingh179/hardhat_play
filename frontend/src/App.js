@@ -1,8 +1,11 @@
 import logo from './logo.svg';
 import './App.css';
 import React from 'react'
-import {Button, Col, Container, Form, FormControl, InputGroup, Row} from "react-bootstrap";
+import {Alert, Button, Col, Container, Form, FormControl, InputGroup, Row} from "react-bootstrap";
 import {ethers} from 'ethers'
+import TokenArtifact from './contracts/Token.json'
+import contractAddress from './contracts/contract-address.json'
+
 window.ethers = ethers
 
 class App extends React.Component {
@@ -15,7 +18,6 @@ class App extends React.Component {
       balance: "",
       provider: ""
     }
-
 
     this._updateWalletAddress = this._updateWalletAddress.bind(this)
     this._updateChainId = this._updateChainId.bind(this)
@@ -54,10 +56,17 @@ class App extends React.Component {
 
   async _getBalance(){
     const {walletAddress, provider} = this.state
-    const balance = await provider.getBalance(walletAddress)
-    this.setState({
-      balance: balance
-    })
+    try {
+      const balance = await provider.getBalance(walletAddress)
+      this.setState({
+        balance: balance
+      })
+    }catch(err){
+      console.warn('error while getting balance: ', err)
+      this.setState({
+        balance: ''
+      })
+    }
   }
 
   async _updateWalletAddress(wa){
@@ -95,11 +104,15 @@ class App extends React.Component {
         </Container>
         <Container className='m-2'>
           {chainId ? "Selected Chain Id: " + ethers.BigNumber.from(chainId).toString() : "No Network"}
+          {chainId && ethers.BigNumber.from(chainId).toString() != '31337' ? <Alert variant='danger'>
+            The network you connected to is NOT localhost!!
+          </Alert> : ''}
         </Container>
         <Container className='m-2'>
           Balance: {balance ? ethers.utils.formatEther(balance) : "N/A"}
         </Container>
         <SendValue provider={provider} getBalance={this._getBalance} />
+        <TokenContract provider={provider} walletAddress={walletAddress} />
       </Container>
     );
   }
@@ -139,7 +152,6 @@ class SendValue extends React.Component {
   }
   render(){
     const {recipientBalance} = this.state
-
     return (
       <Container className='m-2'>
         <Form onSubmit={(evt) => evt.preventDefault()}>
@@ -177,8 +189,8 @@ class SendValue extends React.Component {
       const recipientBalance = await provider.getBalance(evt.target.value)
       this.setState({recipientBalance})
     }catch(err){
+      console.warn('issue while getting recipient balance: ', err)
       this.setState({recipientBalance: ''})
-      console.error('issue while getting recipient balance: ', err)
     }
 
   }
@@ -200,6 +212,114 @@ class SendValue extends React.Component {
       console.error('unable to process transaction: ', e)
     }
   }
+}
+
+class TokenContract extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      name: 'unknown',
+      symbol: 'unknown',
+      tokenCount: 'unknown',
+      to: 'unknown',
+      tokensToSend: 0,
+    }
+  }
+
+  componentDidMount() {
+    console.log(this.props)
+  }
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    const {provider} = this.props
+    if(provider){
+      if(prevProps.provider != provider){
+        const signer = provider.getSigner()
+        this.contract = new ethers.Contract(contractAddress.Token, TokenArtifact.abi, signer)
+        console.log(this.contract)
+      }
+    }else{
+      this.contract = null
+    }
+
+  }
+
+  render(){
+    if (!this.contract){
+      return null
+    }
+    const {name, symbol, tokenCount, to, tokensToSend} = this.state
+
+
+    return (
+      <Container className='m-2'>
+        TokenContract
+        <br/><br/>
+        Name: {name} <Button onClick={this._getName} >Get Name</Button>
+        <br/><br/>
+         Symbol: {symbol} <Button onClick={this._getSymbol} >Get Symbol</Button>
+        <br/><br/>
+        Token Count: {tokenCount} <Button onClick={this._getTokenCount} >Get Token Count</Button>
+        <br/><br/>
+        <Form onSubmit={evt => evt.preventDefault() }>
+          <Row>
+            <Col>
+              <Form.Control placeholder="To"
+                  onChange={ evt => this.setState({to: evt.target.value})} />
+            </Col>
+            <Col>
+              <Form.Control placeholder="Token Count"
+                  onChange={ evt => this.setState({tokensToSend: evt.target.value})} />
+            </Col>
+            <Col>
+              <Button variant="primary" type="submit" onClick={this._handleSendClick}>
+                Send Away
+              </Button>
+            </Col>
+          </Row>
+          <Row>
+            <Col>
+              <p>Clicking this will send {tokensToSend} to {to}. Sure?</p>
+            </Col>
+          </Row>
+        </Form>
+      </Container>
+    )
+  }
+
+  _getName = async () => {
+    const name = await this.contract.name()
+    this.setState({name})
+  }
+
+  _getSymbol = async () => {
+    const symbol = await this.contract.symbol()
+    this.setState({symbol})
+  }
+
+  _getTokenCount = async () => {
+    const {walletAddress} = this.props
+    console.log(walletAddress)
+    const tokenCount = await this.contract.balanceOf(walletAddress)
+    console.log(tokenCount.toString())
+    this.setState({tokenCount: tokenCount.toString()})
+  }
+
+  _handleSendClick = async () => {
+    const {to, tokensToSend} = this.state
+    this.setState({disableTransferButton: true})
+    try{
+      console.log(to, tokensToSend)
+      const tx = await this.contract.transfer(to, tokensToSend)
+      const receipt = await tx.wait()
+      await this._getTokenCount()
+    }catch(e) {
+      console.error('problem while sending: ', e)
+    }finally{
+      this.setState({disableTransferButton: false})
+    }
+  }
+
 }
 
 export default App;
